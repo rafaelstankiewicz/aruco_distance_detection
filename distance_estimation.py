@@ -2,7 +2,7 @@ import cv2 as cv
 from cv2 import aruco
 import numpy as np
 
-calib_data_path = r"C:\Users\Smi\Desktop\Aruco_1\MultiMatrix.npz"
+calib_data_path = r"\\wsl.localhost\Ubuntu-20.04\home\rstankie\mbari\aruco_distance_detection\MultiMatrix.npz"
 
 calib_data = np.load(calib_data_path)
 print(calib_data.files)
@@ -12,9 +12,9 @@ r_vectors = calib_data["rVector"]
 t_vectors = calib_data["tVector"]
 
 
-MARKER_SIZE = 8  
+MARKER_SIZE = 2.3 
 
-marker_dict = aruco.Dictionary_get(aruco.DICT_4X4_50)
+marker_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
 
 param_markers = aruco.DetectorParameters_create()
 

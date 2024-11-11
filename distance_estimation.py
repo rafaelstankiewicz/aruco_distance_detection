@@ -1,25 +1,18 @@
 import cv2 as cv
 from cv2 import aruco
 import numpy as np
-
-calib_data_path = r"\\wsl.localhost\Ubuntu-20.04\home\rstankie\mbari\aruco_distance_detection\MultiMatrix.npz"
-
+calib_data_path = r"MultiMatrix.npz"  # Holds calibration data?
 calib_data = np.load(calib_data_path)
 print(calib_data.files)
 cam_mat = calib_data["camMatrix"]
 dist_coef = calib_data["distCoef"]
 r_vectors = calib_data["rVector"]
 t_vectors = calib_data["tVector"]
-
-
-MARKER_SIZE = 2.3 
-
+MARKER_SIZE = 2.3
 marker_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
-
 param_markers = aruco.DetectorParameters_create()
-
-cap = cv.VideoCapture("http://192.168.31.19:8080/video") #give the server id shown in IP webcam App
-
+cap = cv.VideoCapture("./videos/1.mp4")
+cap.set(cv.CAP_PROP_FPS, 0)
 while True:
     ret, frame = cap.read()
     if not ret:
@@ -43,16 +36,10 @@ while True:
             top_left = corners[1].ravel()
             bottom_right = corners[2].ravel()
             bottom_left = corners[3].ravel()
-
-
-            
             # calculate the distance
             distance = np.sqrt(
                 tVec[i][0][2] ** 2 + tVec[i][0][0] ** 2 + tVec[i][0][1] ** 2
             )
-
-
-
             # for pose of the marker
             point = cv.drawFrameAxes(frame, cam_mat, dist_coef, rVec[i], tVec[i], 4, 4)
             cv.putText(
@@ -77,7 +64,7 @@ while True:
             )
             # print(ids, "  ", corners)
     cv.imshow("frame", frame)
-    key = cv.waitKey(1)
+    key = cv.waitKey(5)
     if key == ord("q"):
         break
 cap.release()

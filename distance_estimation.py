@@ -88,7 +88,7 @@ while True:
                     cv.putText(
                         frame,
                         f"Markers {id1} and {id2} are aligned",
-                        (50, 50)  # Position to display text from top left corner of frame
+                        (50, 50),  # Position to display text from top left corner of frame
                         cv.FONT_HERSHEY_SIMPLEX,
                         1,
                         (0, 255, 0),

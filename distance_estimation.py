@@ -2,9 +2,8 @@ import cv2 as cv
 from cv2 import aruco
 import numpy as np
 
-calib_data_path = r"MultiMatrix.npz"  # Holds calibration data?
+calib_data_path = r"MultiMatrix.npz"  # Holds calibration data
 calib_data = np.load(calib_data_path)
-print(calib_data.files)
 
 cam_mat = calib_data["camMatrix"]
 dist_coef = calib_data["distCoef"]
@@ -12,23 +11,28 @@ r_vectors = calib_data["rVector"]
 t_vectors = calib_data["tVector"]
 MARKER_SIZE = 2.3  # in cm
 
-marker_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
-param_markers = aruco.DetectorParameters_create()
-cap = cv.VideoCapture("./videos/1.mp4")
+marker_dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_5X5_1000)
+param_markers =  cv.aruco.DetectorParameters()
+param_markers.polygonalApproxAccuracyRate = 0.03
+param_markers.maxErroneousBitsInBorderRate = 0.5
+detector = cv.aruco.ArucoDetector(marker_dict, param_markers)
+
+cap = cv.VideoCapture("2.MOV")
 
 while True:
     ret, frame = cap.read()
     if not ret:
         break
+
     gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-    marker_corners, marker_IDs, reject = aruco.detectMarkers(
-        gray_frame, marker_dict, parameters=param_markers
-    )
+    marker_corners, marker_IDs, reject = detector.detectMarkers(gray_frame)
     if marker_corners:
         rVec, tVec, _ = aruco.estimatePoseSingleMarkers(
             marker_corners, MARKER_SIZE, cam_mat, dist_coef
         )
         total_markers = range(0, marker_IDs.size)
+        # if marker_IDs.size > 1 or (marker_IDs.size == 1 and marker_IDs[0][0]!=999):
+        #     print(marker_IDs)
 
         # List to store each marker's (x, z) position and ID
         positions = []
@@ -84,7 +88,7 @@ while True:
                 id2, x2, z2 = positions[j]
 
                 # Alignment threshold
-                if abs(x1-x2) < 0.1 and abs(z1-z2) < 0.1:
+                if abs(x1-x2) < 2 and abs(z1-z2) < 2:
                     cv.putText(
                         frame,
                         f"Markers {id1} and {id2} are aligned",
@@ -95,10 +99,15 @@ while True:
                         2,
                         cv.LINE_AA,
                     )
+                    cv.waitKey(-1)
+                    print("bazinga!")
             # print(ids, "  ", corners)
     cv.imshow("frame", frame)
-    key = cv.waitKey(5)
+
+    key = cv.waitKey(1)
     if key == ord("q"):
         break
+    if key == ord('p'):
+        cv.waitKey(-1) # Wait until any key is pressed
 cap.release()
 cv.destroyAllWindows()

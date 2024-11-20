@@ -2,7 +2,13 @@ import cv2 as cv
 from cv2 import aruco
 import numpy as np
 
-calib_data_path = r"MultiMatrix.npz"  # Holds calibration data
+# To do: 
+# 1. Implement Kalman filter and marker alignment and axil display improves
+# 2. Walk through code line-by-line for understanding
+# 3. Clean up code, make more object-oriented, commit to Clinic repo
+# 4. Calibrate iPhone camera?
+
+calib_data_path = r"MultiMatrix.npz"
 calib_data = np.load(calib_data_path)
 
 cam_mat = calib_data["camMatrix"]
@@ -17,7 +23,15 @@ param_markers.polygonalApproxAccuracyRate = 0.03
 param_markers.maxErroneousBitsInBorderRate = 0.5
 detector = cv.aruco.ArucoDetector(marker_dict, param_markers)
 
-cap = cv.VideoCapture("2.MOV")
+cap = cv.VideoCapture("1.MOV")
+
+frame_width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+fps = int(cap.get(cv.CAP_PROP_FPS))
+
+output_path = "output.mp4"
+fourcc = cv.VideoWriter_fourcc(*'mp4v')
+out = cv.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
 while True:
     ret, frame = cap.read()
@@ -82,6 +96,7 @@ while True:
             )
 
         # Check if any two markers are aligned in (x, z) position
+        freeze_frame = False
         for i in range(len(positions)):
             for j in range(i+1, len(positions)):
                 id1, x1, z1 = positions[i]
@@ -99,9 +114,22 @@ while True:
                         2,
                         cv.LINE_AA,
                     )
-                    cv.waitKey(-1)
-                    print("bazinga!")
+
+                    cv.imshow("frame", frame)
+                    cv.waitKey(5000)  # Pauses video for 5 sec in video player 
+
+                    freeze_frame = True  # Marker alignment bool
+                    prev_frame = frame.copy()
+                    break
+
             # print(ids, "  ", corners)
+
+        # Freeze output video for 5 sec when markers are aligned
+        if freeze_frame and prev_frame is not None:
+            for _ in range(int(fps * 5)):
+                out.write(prev_frame)
+
+    out.write(frame)
     cv.imshow("frame", frame)
 
     key = cv.waitKey(1)
@@ -109,5 +137,7 @@ while True:
         break
     if key == ord('p'):
         cv.waitKey(-1) # Wait until any key is pressed
+
 cap.release()
+out.release()
 cv.destroyAllWindows()

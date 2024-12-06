@@ -1,4 +1,4 @@
 requests
-opencv-python==4.9.0.80
-opencv-contrib-python==4.9.0.80
-numpy<2
+opencv-python==4.10.0.84
+opencv-contrib-python==4.10.0.84
+numpy == 2.1.3

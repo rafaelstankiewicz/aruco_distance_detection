@@ -1,14 +1,15 @@
 import cv2 as cv
-from cv2 import aruco
 import numpy as np
+import kalman
+from cv2 import aruco
+from kalman import init_kalman, apply_kalman
 
 # To do: 
-# 1. Implement Kalman filter and marker alignment and axil display improves
-# 2. Walk through code line-by-line for understanding
-# 3. Clean up code, make more object-oriented, commit to Clinic repo
-# 4. Calibrate iPhone camera?
+# 1. Walk through code line-by-line for understanding
+# 2. Clean up code, make more object-oriented, commit to Clinic repo
+# 3. Calibrate MBARI cameras
 
-calib_data_path = r"MultiMatrix.npz"
+calib_data_path = r"MultiMatrix.npz" #TODO: replace with MBARI camera calibration
 calib_data = np.load(calib_data_path)
 
 cam_mat = calib_data["camMatrix"]
@@ -16,6 +17,7 @@ dist_coef = calib_data["distCoef"]
 r_vectors = calib_data["rVector"]
 t_vectors = calib_data["tVector"]
 MARKER_SIZE = 2.3  # in cm
+
 
 marker_dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_5X5_1000)
 param_markers =  cv.aruco.DetectorParameters()
@@ -33,27 +35,37 @@ output_path = "output.mp4"
 fourcc = cv.VideoWriter_fourcc(*'mp4v')
 out = cv.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
+kalman_filters = {}  # Per marker
+
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
     gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-    marker_corners, marker_IDs, reject = detector.detectMarkers(gray_frame)
-    if marker_corners:
+    corners, ids, rejected = detector.detectMarkers(gray_frame)
+
+    if ids is not None:  # Why not if corners?
         rVec, tVec, _ = aruco.estimatePoseSingleMarkers(
-            marker_corners, MARKER_SIZE, cam_mat, dist_coef
+            corners, MARKER_SIZE, cam_mat, dist_coef
         )
-        total_markers = range(0, marker_IDs.size)
+        total_markers = range(0, ids.size)
         # if marker_IDs.size > 1 or (marker_IDs.size == 1 and marker_IDs[0][0]!=999):
         #     print(marker_IDs)
 
-        # List to store each marker's (x, z) position and ID
-        positions = []
+        positions = []  # Store each marker's (x, z) position and ID
 
-        for ids, corners, i in zip(marker_IDs, marker_corners, total_markers):
-            x, y, z = tVec[i][0]  # Extract x, y, z coordinates
-            positions.append((ids[0], x, z))
+        for marker_id, corners, i in zip(ids.flatten(), corners, total_markers):
+            x, y, z = tVec[i][0]  # Extract raw x, y, z coordinates
+
+            if marker_id not in kalman_filters:
+                kalman_filters[marker_id] = init_kalman()
+
+            # Apply Kalman filter
+            measurement = np.array([[x], [z]], dtype=np.float32)
+            x_kalman, z_kalman = apply_kalman(kalman_filters[marker_id], measurement)
+
+            positions.append((marker_id, x_kalman, z_kalman))  # Store smoothed positions
 
             # Draw marker borders and annotations
             cv.polylines(
@@ -62,20 +74,18 @@ while True:
             corners = corners.reshape(4, 2)
             corners = corners.astype(int)
             top_right = corners[0].ravel()
-            top_left = corners[1].ravel()
+            # top_left = corners[1].ravel()
             bottom_right = corners[2].ravel()
-            bottom_left = corners[3].ravel()
+            # bottom_left = corners[3].ravel()
             
-            # Calculate distance
-            distance = np.sqrt(
-                tVec[i][0][2] ** 2 + tVec[i][0][0] ** 2 + tVec[i][0][1] ** 2
-            )
+            # Calculate distance use smoothed coordinates
+            distance = np.sqrt(x_kalman**2 + z_kalman**2)
             
             # Display local coordinate frame of each marker
             point = cv.drawFrameAxes(frame, cam_mat, dist_coef, rVec[i], tVec[i], 4, 4)
             cv.putText(
                 frame,
-                f"id: {ids[0]} Dist: {round(distance, 2)}",
+                f"id: {marker_id} Dist: {round(distance, 2)}",
                 top_right,
                 cv.FONT_HERSHEY_PLAIN,
                 1.3,
@@ -86,7 +96,7 @@ while True:
 
             cv.putText(
                 frame,
-                f"x:{round(tVec[i][0][0],1)} y: {round(tVec[i][0][1],1)} ",
+                f"x:{round(x_kalman,1)} z:{round(z_kalman,1)}",
                 bottom_right,
                 cv.FONT_HERSHEY_PLAIN,
                 1.0,
@@ -95,7 +105,7 @@ while True:
                 cv.LINE_AA,
             )
 
-        # Check if any two markers are aligned in (x, z) position
+        # Check if markers are aligned in (x, z) position
         freeze_frame = False
         for i in range(len(positions)):
             for j in range(i+1, len(positions)):

@@ -1,2 +1,5 @@
+\.venv
 \venv
 \videos
+\dewarpedVideos
+\output.mp4

@@ -23,7 +23,7 @@ param_markers.polygonalApproxAccuracyRate = 0.03
 param_markers.maxErroneousBitsInBorderRate = 0.5
 detector = cv.aruco.ArucoDetector(marker_dict, param_markers)
 
-cap = cv.VideoCapture("1.MOV")
+cap = cv.VideoCapture("./dewarpedVideos/whiteBorderDemo3.mp4")
 
 frame_width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
@@ -33,12 +33,30 @@ output_path = "output.mp4"
 fourcc = cv.VideoWriter_fourcc(*'mp4v')
 out = cv.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
+# Because the sampler footage is at such a high resolution.. scaling it down for display purposes
+def rescaleFrame(frame, percent=75):
+    width = int(frame.shape[1] * percent/100)
+    height = int(frame.shape[0] * percent/100)
+    dim = (width, height)
+    return cv.resize(frame, dim, interpolation=cv.INTER_AREA)
+
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
+    # R, G, B = cv.split(frame)
+    # output_R = cv.equalizeHist(R)
+    # output_G = cv.equalizeHist(G)
+    # output_B = cv.equalizeHist(B)
+
+    # frame = cv.merge((output_R, output_G, output_B))
+
     gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+
+    gray_frame = cv.equalizeHist(gray_frame)
+
+
     marker_corners, marker_IDs, reject = detector.detectMarkers(gray_frame)
     if marker_corners:
         rVec, tVec, _ = aruco.estimatePoseSingleMarkers(
@@ -130,6 +148,8 @@ while True:
                 out.write(prev_frame)
 
     out.write(frame)
+
+    frame = rescaleFrame(frame, percent=60)
     cv.imshow("frame", frame)
 
     key = cv.waitKey(1)

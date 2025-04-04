@@ -1,13 +1,14 @@
 import cv2 as cv
 import numpy as np
-import kalman
 from cv2 import aruco
 from kalman import init_kalman, apply_kalman
 
 # To do: 
-# 1. Walk through code line-by-line for understanding
-# 2. Clean up code, make more object-oriented, commit to Clinic repo
-# 3. Calibrate MBARI cameras
+# 1. Walk through code line-by-line, review, clean up, make more object-oriented, commit to Clinic repo
+# 2. Calibrate MBARI cameras
+# 3. Try adaptive thresholding-- cv2.adaptiveThreshold
+# 4. Verify marker size-- 2 or 4 in?
+# 5. Debug rotation and translation vectors
 
 calib_data_path = r"MultiMatrix.npz" #TODO: replace with MBARI camera calibration
 calib_data = np.load(calib_data_path)
@@ -18,20 +19,20 @@ r_vectors = calib_data["rVector"]
 t_vectors = calib_data["tVector"]
 MARKER_SIZE = 2.3  # in cm
 
-
 marker_dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_5X5_1000)
 param_markers =  cv.aruco.DetectorParameters()
 param_markers.polygonalApproxAccuracyRate = 0.03
 param_markers.maxErroneousBitsInBorderRate = 0.5
 detector = cv.aruco.ArucoDetector(marker_dict, param_markers)
 
-cap = cv.VideoCapture("1.MOV")
+cap = cv.VideoCapture("outputWhiteBorderDemo1.mp4")
 
 frame_width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+
 fps = int(cap.get(cv.CAP_PROP_FPS))
 
-output_path = "output.mp4"
+output_path = "/mnt/c/Users/rstan/Downloads/kalman_filter_white_border.mp4"
 fourcc = cv.VideoWriter_fourcc(*'mp4v')
 out = cv.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
@@ -42,10 +43,12 @@ while True:
     if not ret:
         break
 
+    frame = cv.resize(frame,(490,852))
+
     gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
     corners, ids, rejected = detector.detectMarkers(gray_frame)
 
-    if ids is not None:  # Why not if corners?
+    if ids is not None:  # If corners?
         rVec, tVec, _ = aruco.estimatePoseSingleMarkers(
             corners, MARKER_SIZE, cam_mat, dist_coef
         )
@@ -85,7 +88,7 @@ while True:
             point = cv.drawFrameAxes(frame, cam_mat, dist_coef, rVec[i], tVec[i], 4, 4)
             cv.putText(
                 frame,
-                f"id: {marker_id} Dist: {round(distance, 2)}",
+                f"id: {marker_id} Dist: {np.round(distance, 2)}",
                 top_right,
                 cv.FONT_HERSHEY_PLAIN,
                 1.3,
@@ -96,7 +99,7 @@ while True:
 
             cv.putText(
                 frame,
-                f"x:{round(x_kalman,1)} z:{round(z_kalman,1)}",
+                f"x:{np.round(x_kalman,1)} z:{np.round(z_kalman,1)}",
                 bottom_right,
                 cv.FONT_HERSHEY_PLAIN,
                 1.0,
@@ -105,39 +108,39 @@ while True:
                 cv.LINE_AA,
             )
 
-        # Check if markers are aligned in (x, z) position
-        freeze_frame = False
-        for i in range(len(positions)):
-            for j in range(i+1, len(positions)):
-                id1, x1, z1 = positions[i]
-                id2, x2, z2 = positions[j]
+        # # Check if markers are aligned in (x, z) position
+        # freeze_frame = False
+        # for i in range(len(positions)):
+        #     for j in range(i+1, len(positions)):
+        #         id1, x1, z1 = positions[i]
+        #         id2, x2, z2 = positions[j]
 
-                # Alignment threshold
-                if abs(x1-x2) < 2 and abs(z1-z2) < 2:
-                    cv.putText(
-                        frame,
-                        f"Markers {id1} and {id2} are aligned",
-                        (50, 50),  # Position to display text from top left corner of frame
-                        cv.FONT_HERSHEY_SIMPLEX,
-                        1,
-                        (0, 255, 0),
-                        2,
-                        cv.LINE_AA,
-                    )
+        #         # Alignment threshold
+        #         if abs(x1-x2) < 2 and abs(z1-z2) < 2:
+        #             cv.putText(
+        #                 frame,
+        #                 f"Markers {id1} and {id2} are aligned",
+        #                 (50, 50),  # Position to display text from top left corner of frame
+        #                 cv.FONT_HERSHEY_SIMPLEX,
+        #                 1,
+        #                 (0, 255, 0),
+        #                 2,
+        #                 cv.LINE_AA,
+        #             )
 
-                    cv.imshow("frame", frame)
-                    cv.waitKey(5000)  # Pauses video for 5 sec in video player 
+        #             cv.imshow("frame", frame)
+        #             cv.waitKey(5000)  # Pauses video for 5 sec in video player 
 
-                    freeze_frame = True  # Marker alignment bool
-                    prev_frame = frame.copy()
-                    break
+        #             freeze_frame = True  # Marker alignment bool
+        #             prev_frame = frame.copy()
+        #             break
 
-            # print(ids, "  ", corners)
+        #     # print(ids, "  ", corners)
 
-        # Freeze output video for 5 sec when markers are aligned
-        if freeze_frame and prev_frame is not None:
-            for _ in range(int(fps * 5)):
-                out.write(prev_frame)
+        # # Freeze output video for 5 sec when markers are aligned
+        # if freeze_frame and prev_frame is not None:
+        #     for _ in range(int(fps * 5)):
+        #         out.write(prev_frame)
 
     out.write(frame)
     cv.imshow("frame", frame)

@@ -18,8 +18,8 @@ def init_kalman():
 
     kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 3e-2  # Process noise covariance
     kalman.measurementNoiseCov = np.eye(2, dtype=np.float32) * 1e-1  # Measurement noise covariance
-    kalman.errorCov = np.eye(4, dtype=np.float32) * 1e-1  # State error covariance
-    kalman.state = np.zeros(4, dtype=np.float32)  # Initial state estimate
+    kalman.errorCovPost = np.eye(4, dtype=np.float32) * 1e-1  # State error covariance
+    kalman.statePost = np.zeros(4, dtype=np.float32)  # Initial state estimate
 
     return kalman
 

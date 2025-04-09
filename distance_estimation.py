@@ -10,8 +10,7 @@ from tcp_server import MarkerPoseServer
 # 2. Walk through code line-by-line, review, clean up, make more object-oriented, commit to Clinic repo
 # 3. Calibrate MBARI cameras, confirm unit of measurment
 # 4. Try adaptive thresholding-- cv2.adaptiveThreshold
-# 5. Verify marker size-- 3 in?
-# 6. Debug rotation and translation vectors
+# 5. Debug rotation and translation vectors
 
 # Establish TCP connection
 pose_server = MarkerPoseServer()
@@ -25,7 +24,7 @@ cam_mat = calib_data["camMatrix"]
 dist_coef = calib_data["distCoef"]
 r_vectors = calib_data["rVector"]
 t_vectors = calib_data["tVector"]
-MARKER_SIZE = 2.3  # Units = cm?
+MARKER_SIZE = 4.2  # In cm, refers to marker only and not white border
 
 marker_dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_5X5_1000)
 param_markers =  cv.aruco.DetectorParameters()

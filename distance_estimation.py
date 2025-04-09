@@ -1,23 +1,31 @@
 import cv2 as cv
 import numpy as np
 from cv2 import aruco
+import threading
 from kalman import init_kalman, apply_kalman
+from tcp_server import MarkerPoseServer
 
 # To do: 
-# 1. Walk through code line-by-line, review, clean up, make more object-oriented, commit to Clinic repo
-# 2. Calibrate MBARI cameras
-# 3. Try adaptive thresholding-- cv2.adaptiveThreshold
-# 4. Verify marker size-- 2 or 4 in?
-# 5. Debug rotation and translation vectors
+# 1. Implement Kalman filter for both orientation and detection
+# 2. Walk through code line-by-line, review, clean up, make more object-oriented, commit to Clinic repo
+# 3. Calibrate MBARI cameras, confirm unit of measurment
+# 4. Try adaptive thresholding-- cv2.adaptiveThreshold
+# 5. Verify marker size-- 3 in?
+# 6. Debug rotation and translation vectors
 
-calib_data_path = r"MultiMatrix.npz" #TODO: replace with MBARI camera calibration
+# Establish TCP connection
+pose_server = MarkerPoseServer()
+server_thread = threading.Thread(target=pose_server.wait_for_connection, daemon=True)
+server_thread.start()
+
+calib_data_path = r"MultiMatrix.npz" # TODO: replace with MBARI camera calibration
 calib_data = np.load(calib_data_path)
 
 cam_mat = calib_data["camMatrix"]
 dist_coef = calib_data["distCoef"]
 r_vectors = calib_data["rVector"]
 t_vectors = calib_data["tVector"]
-MARKER_SIZE = 2.3  # in cm
+MARKER_SIZE = 2.3  # Units = cm?
 
 marker_dict = cv.aruco.getPredefinedDictionary(cv.aruco.DICT_5X5_1000)
 param_markers =  cv.aruco.DetectorParameters()
@@ -25,14 +33,14 @@ param_markers.polygonalApproxAccuracyRate = 0.03
 param_markers.maxErroneousBitsInBorderRate = 0.5
 detector = cv.aruco.ArucoDetector(marker_dict, param_markers)
 
-cap = cv.VideoCapture("outputWhiteBorderDemo1.mp4")
+cap = cv.VideoCapture("1.MOV")  # Change to ROV video stream
 
 frame_width = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
 
 fps = int(cap.get(cv.CAP_PROP_FPS))
 
-output_path = "/mnt/c/Users/rstan/Downloads/kalman_filter_white_border.mp4"
+output_path = "/mnt/c/Users/rstan/Downloads/kalman_filter_test_footage.mp4"
 fourcc = cv.VideoWriter_fourcc(*'mp4v')
 out = cv.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
@@ -67,6 +75,9 @@ while True:
             # Apply Kalman filter
             measurement = np.array([[x], [z]], dtype=np.float32)
             x_kalman, z_kalman = apply_kalman(kalman_filters[marker_id], measurement)
+
+            # Send pose to Unity
+            pose_server.send_pose(marker_id, tVec[i][0], rVec[i][0])
 
             positions.append((marker_id, x_kalman, z_kalman))  # Store smoothed positions
 
@@ -154,3 +165,4 @@ while True:
 cap.release()
 out.release()
 cv.destroyAllWindows()
+pose_server.close()
